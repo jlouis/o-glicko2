@@ -1,0 +1,8 @@
+*.o
+*.cmx
+*.cmo
+*.cmi
+._d
+._bcdi
+._ncdi/
+glicko2

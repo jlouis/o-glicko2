@@ -17,3 +17,6 @@ val e : float -> float -> float -> float
 val scale : float -> float -> float * float
 
 val rate : player -> opponent list -> player
+
+val bench_data : unit -> (player * opponent list)
+val bench : (player * opponent list) -> unit

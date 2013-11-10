@@ -121,21 +121,19 @@ let rate {r; rd; sigma} opps =
 	let (r1, rd1) = unscale mup phip in
 	{r = r1; rd = rd1; sigma = sigmap}
 
-let bench () =
+let bench_data() =
 	let p = {r = 1500.0; rd = 200.0; sigma = 0.06} in
 	let opps =
 		[{rj = 1400.0; rdj = 30.0; sj = 1.0};
 		 {rj = 1550.0; rdj = 100.0; sj = 0.0};
 		 {rj = 1700.0; rdj = 300.0; sj = 0.0}] in
-	let loop = function
-		| 0 -> ()
-		| n ->
-			rate p opps;
-			loop (n-1) in
-		loop
+	  (p, opps)
+
+let bench (p, opps) = ignore (rate p opps)
+
 
 (* Simple Test *)
-let _ =
+let simple_test () =
 	let r = 1500.0 in
 	let rd = 200.0 in
 	let sigma = 0.06 in
