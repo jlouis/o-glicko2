@@ -16,7 +16,6 @@ let printf_opponents opps = List.iter print_opponent opps
 
 (* Constants *)
 let pi = 3.14159265
-let tau = 0.5
 let epsilon = 0.000001
 
 let scale_factor = 173.7178
@@ -53,7 +52,7 @@ let compute_delta v opps =
 	  v *. sum (List.map f opps)
     
 (* Step 5: Volatility computation *)
-let vol_f phi v delta a =
+let vol_f phi v delta a tau =
 	let phi2 = phi *. phi in
 	  function x ->
 	    let ex = exp x in
@@ -63,36 +62,45 @@ let vol_f phi v delta a =
 	    let p1 = (ex *. (d2 -. phi2 -. v -. ex)) /. (2.0 *. a2 *. a2) in
 	      p1 -. p2
 	    
-let rec vol_k k f a =
+let rec vol_k k f a tau =
 	let const = a -. (float_of_int k) *. sqrt (tau *. tau) in
 	if (f const) < 0.0 then
-		vol_k (k + 1) f a
+		vol_k (k + 1) f a tau
 	else
 		const
 
-let compute_volatility sigma phi v delta =
-	let rec loop a b f fa fb =
-		if abs_float (b -. a) < epsilon then
-			exp (a /. 2.0)
-		else
-			let c = a +. (a -. b) *. fa /. (fb -. fa) in
-			let fc = f c in
-			let (na, nfa) =
-				if fc *. fb < 0.0 then
-					(b, fb)
-				else
-					(a, fa /. 2.0) in
-			loop na c f nfa fc in
+let sign x = float_of_int (compare x 0.0)
+
+exception Exceeded_Iterations
+let rec compute_volatility a b f fa fb = function
+  | 0 -> raise Exceeded_Iterations
+  | k ->
+      if abs_float(b -. a) <= epsilon then
+      	exp (a /. 2.0)
+      else
+         let c = (a +. b) *. 0.5 in
+         let fc = f c in
+         let d = c +. (c -. a) *. (sign(fa -. fb) *. fc) /. sqrt(fc *. fc -. fa *. fb) in
+         let fd = f d in
+           if (sign fd) != (sign fc) then
+           	compute_volatility c d f fc fd (k-1)
+           else
+           	if (sign fd) != (sign fa) then
+           		compute_volatility a d f fa fd (k-1)
+           	else
+           		compute_volatility d b f fd fb (k-1)
+
+let i_compute_volatility sigma phi v delta tau =
 	let a = log (sigma *. sigma) in
-	let f = vol_f phi v delta a in
-	let b =
-		if delta *. delta > phi *. phi +. v then
+	let f = vol_f phi v delta a tau in
+	let b = if delta *. delta > phi *. phi +. v then
 			log (delta *. delta -. phi *. phi -. v)
 		else
-			vol_k 1 f a in
-	let fa = f a in
+			vol_k 1 f a tau
+		in
+	let fa = f a in 
 	let fb = f b in
-	  loop a b f fa fb
+	  compute_volatility a b f fa fb 100
 
 (* Step 6 *)
 let phi_star sp phi = sqrt ( square phi +. square sp )
@@ -111,11 +119,12 @@ let unscale mup phip =
 	(rp, rdp)
 	
 let rate {r; rd; sigma} opps =
+	let tau = 0.5 in
 	let (mu, phi) = scale r rd in
 	let sopps = scale_opponents mu opps in
 	let v = update_rating sopps in
 	let delta = compute_delta v sopps in
-	let sigmap = compute_volatility sigma phi v delta in
+	let sigmap = i_compute_volatility sigma phi v delta tau in
 	let phistar = phi_star sigmap phi in
 	let (mup, phip) = new_rating phistar mu v sopps in
 	let (r1, rd1) = unscale mup phip in
@@ -134,6 +143,7 @@ let bench (p, opps) = ignore (rate p opps)
 
 (* Simple Test *)
 let simple_test () =
+	let tau = 0.5 in
 	let r = 1500.0 in
 	let rd = 200.0 in
 	let sigma = 0.06 in
@@ -146,7 +156,7 @@ let simple_test () =
 	let sopps = scale_opponents mu opps in
 	let v = update_rating sopps in
 	let delta = compute_delta v sopps in
-	let sigmap = compute_volatility sigma phi v delta in
+	let sigmap = i_compute_volatility sigma phi v delta tau in
 	let phistar = phi_star sigmap phi in
 	let (mup, phip) = new_rating phistar mu v sopps in
 	let (r1, rd1) = unscale mup phip in
