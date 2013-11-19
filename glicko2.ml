@@ -52,16 +52,6 @@ let compute_delta v opps =
 	  v *. sum (List.map f opps)
     
 (* Step 5: Volatility computation *)
-let vol_f phi v delta a tau =
-	let phi2 = phi *. phi in
-	  function x ->
-	    let ex = exp x in
-	    let d2 = delta *. delta in
-	    let a2 = phi2 +. v +. ex in
-	    let p2 = (x -. a) /. (tau *. tau) in
-	    let p1 = (ex *. (d2 -. phi2 -. v -. ex)) /. (2.0 *. a2 *. a2) in
-	      p1 -. p2
-	    
 let rec vol_k k f a tau =
 	let const = a -. (float_of_int k) *. sqrt (tau *. tau) in
 	if (f const) < 0.0 then
@@ -72,27 +62,17 @@ let rec vol_k k f a tau =
 let sign x = float_of_int (compare x 0.0)
 
 exception Exceeded_Iterations
-let rec compute_volatility a b f fa fb = function
-  | 0 -> raise Exceeded_Iterations
-  | k ->
-      if abs_float(b -. a) <= epsilon then
-      	exp (a /. 2.0)
-      else
-         let c = (a +. b) *. 0.5 in
-         let fc = f c in
-         let d = c +. (c -. a) *. (sign(fa -. fb) *. fc) /. sqrt(fc *. fc -. fa *. fb) in
-         let fd = f d in
-           if (sign fd) != (sign fc) then
-           	compute_volatility c d f fc fd (k-1)
-           else
-           	if (sign fd) != (sign fa) then
-           		compute_volatility a d f fa fd (k-1)
-           	else
-           		compute_volatility d b f fd fb (k-1)
 
 let i_compute_volatility sigma phi v delta tau =
 	let a = log (sigma *. sigma) in
-	let f = vol_f phi v delta a tau in
+	let phi2 = phi *. phi in
+	let f = function x ->
+	    let ex = exp x in
+	    let d2 = delta *. delta in
+	    let a2 = phi2 +. v +. ex in
+	    let p2 = (x -. a) /. (tau *. tau) in
+	    let p1 = (ex *. (d2 -. phi2 -. v -. ex)) /. (2.0 *. a2 *. a2) in
+	      p1 -. p2 in
 	let b = if delta *. delta > phi *. phi +. v then
 			log (delta *. delta -. phi *. phi -. v)
 		else
@@ -100,7 +80,24 @@ let i_compute_volatility sigma phi v delta tau =
 		in
 	let fa = f a in 
 	let fb = f b in
-	  compute_volatility a b f fa fb 100
+	let loop a b f fa fb = function
+	  | 0 -> raise Exceeded_Iterations
+	  | k ->
+	      if abs_float(b -. a) <= epsilon then
+	      	exp (a /. 2.0)
+	      else
+	         let c = (a +. b) *. 0.5 in
+	         let fc = f c in
+	         let d = c +. (c -. a) *. (sign(fa -. fb) *. fc) /. sqrt(fc *. fc -. fa *. fb) in
+	         let fd = f d in
+	           if (sign fd) != (sign fc) then
+	           	loop c d f fc fd (k-1)
+	           else
+	           	if (sign fd) != (sign fa) then
+	           		loop a d f fa fd (k-1)
+	           	else
+	           		loop d b f fd fb (k-1) in
+	  loop a b f fa fb 100
 
 (* Step 6 *)
 let phi_star sp phi = sqrt ( square phi +. square sp )
