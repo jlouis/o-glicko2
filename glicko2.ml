@@ -80,7 +80,7 @@ let i_compute_volatility sigma phi v delta tau =
 		in
 	let fa = f a in 
 	let fb = f b in
-	let loop a b f fa fb = function
+	let rec loop a b f fa fb = function
 	  | 0 -> raise Exceeded_Iterations
 	  | k ->
 	      if abs_float(b -. a) <= epsilon then
